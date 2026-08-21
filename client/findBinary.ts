@@ -286,9 +286,7 @@ export async function searchEnvPath(
     }),
   );
 
-  return binary.find((candidate): candidate is BinarySearchResult =>
-    candidate !== undefined && canRunBinaryInCurrentWorkspace(candidate),
-  );
+  return binary.find((candidate) => candidate !== undefined && canRunBinaryInCurrentWorkspace(candidate));
 }
 
 /**
