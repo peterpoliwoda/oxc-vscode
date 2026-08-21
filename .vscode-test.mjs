@@ -4,6 +4,11 @@ import path from "node:path";
 
 const multiRootWorkspaceFile = "./tests/multi-root.test.code-workspace";
 const emptyBinDir = "./tests/empty_bin";
+const sanitizedPath = [
+  path.resolve(import.meta.dirname, emptyBinDir),
+  ...(process.env.PATH?.split(path.delimiter).filter((entry) => !entry.includes("node_modules/.bin")) ??
+    []),
+].join(path.delimiter);
 
 mkdirSync("./tests/test_workspace", { recursive: true });
 mkdirSync("./tests/test_workspace_second", { recursive: true });
@@ -97,7 +102,7 @@ const allTestSuites = new Map([
       ...baseTest,
       env: {
         SINGLE_FOLDER_WORKSPACE: "true",
-        PATH: path.resolve(import.meta.dirname, emptyBinDir),
+        PATH: sanitizedPath,
       },
     },
   ],
