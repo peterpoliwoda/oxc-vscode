@@ -51,6 +51,20 @@ export async function activate(context: ExtensionContext) {
     },
   );
 
+  const onDidGrantWorkspaceTrustDispose = workspace.onDidGrantWorkspaceTrust(async () => {
+    outputChannelLint.info("Workspace trust granted, restarting oxlint tool.");
+    outputChannelFormat.info("Workspace trust granted, restarting oxfmt tool.");
+    await Promise.all(
+      tools.map(async (tool) => {
+        if (tool instanceof Linter) {
+          await restartTool(tool, outputChannelLint);
+        } else if (tool instanceof Formatter) {
+          await restartTool(tool, outputChannelFormat);
+        }
+      }),
+    );
+  });
+
   context.subscriptions.push(
     showOutputLintCommand,
     showOutputFmtCommand,
@@ -59,6 +73,7 @@ export async function activate(context: ExtensionContext) {
     outputChannelLint,
     outputChannelFormat,
     onDidChangeWorkspaceFoldersDispose,
+    onDidGrantWorkspaceTrustDispose,
     statusBarItemHandler,
   );
 

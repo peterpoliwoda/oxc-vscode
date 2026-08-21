@@ -89,6 +89,17 @@ const allTestSuites = new Map([
       },
     },
   ],
+  [
+    "untrusted-workspace",
+    {
+      ...baseTest,
+      launchArgs: [...baseTest.launchArgs, "--disable-workspace-trust"],
+      env: {
+        SINGLE_FOLDER_WORKSPACE: "true",
+        PATH: "",
+      },
+    },
+  ],
 ]);
 
 export default defineConfig({

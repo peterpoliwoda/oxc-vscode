@@ -13,6 +13,26 @@ export type BinarySearchResult = {
   yarnPnpLoaderPath?: string; // only set if loader is 'node' and found via Yarn PnP
 };
 
+function isPathInsideWorkspace(candidatePath: string): boolean {
+  const normalizedCandidate = path.normalize(candidatePath);
+
+  return (workspace.workspaceFolders ?? []).some((folder) => {
+    const relative = path.relative(folder.uri.fsPath, normalizedCandidate);
+    return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  });
+}
+
+export function isWorkspaceDerivedBinary(binary: BinarySearchResult): boolean {
+  return (
+    isPathInsideWorkspace(binary.path) ||
+    (binary.yarnPnpLoaderPath !== undefined && isPathInsideWorkspace(binary.yarnPnpLoaderPath))
+  );
+}
+
+export function canRunBinaryInCurrentWorkspace(binary: BinarySearchResult): boolean {
+  return workspace.isTrusted || !isWorkspaceDerivedBinary(binary);
+}
+
 /** @internal only used for testing */
 export function replaceTargetFromMainToBin(resolvedPath: string, binaryName: string): string {
   // Walk up from the resolved main file to find the nearest package.json
@@ -93,6 +113,10 @@ export function clearWorkspacePackageJsonNodeModulesCache(): void {
 export async function searchProjectNodeModulesBin(
   binaryName: string,
 ): Promise<BinarySearchResult | undefined> {
+  if (!workspace.isTrusted) {
+    return undefined;
+  }
+
   // try to find shared binary inside `node_modules/.bin` of each workspace folder
   // This is required, because the project can use `vite-plus`,
   // which has different environment variables for `oxlint` and `oxfmt`.
@@ -210,7 +234,7 @@ export async function searchGlobalNodeModulesBin(
   // which has different environment variables for `oxlint` and `oxfmt`.
   // Example: It will skip the `vite.config.ts` search without `VP_VERSION` env variable.
   const result = await searchNodeModulesDefaultBinPath(binaryName, globalPaths);
-  if (result) {
+  if (result && canRunBinaryInCurrentWorkspace(result)) {
     return result;
   }
   // fallback to direct binary lookup via require.resolve
@@ -219,7 +243,10 @@ export async function searchGlobalNodeModulesBin(
       require.resolve(binaryName, { paths: globalPaths }),
       binaryName,
     );
-    return { path: resolvedPath, loader: "node" };
+    const result = { path: resolvedPath, loader: "node" } satisfies BinarySearchResult;
+    if (canRunBinaryInCurrentWorkspace(result)) {
+      return result;
+    }
   } catch {}
 }
 
@@ -259,7 +286,9 @@ export async function searchEnvPath(
     }),
   );
 
-  return binary.find(Boolean);
+  return binary.find((candidate): candidate is BinarySearchResult =>
+    candidate !== undefined && canRunBinaryInCurrentWorkspace(candidate),
+  );
 }
 
 /**
