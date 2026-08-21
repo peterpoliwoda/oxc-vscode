@@ -22,6 +22,7 @@ import {
 
 import { OxcCommands } from "../commands";
 import { ConfigService } from "../ConfigService";
+import { canRunBinaryInCurrentWorkspace } from "../findBinary";
 import StatusBarItemHandler from "../StatusBarItemHandler";
 import { onClientNotification, runExecutable } from "./lsp_helper";
 import ToolInterface from "./ToolInterface";
@@ -247,6 +248,7 @@ const supportedLanguageIds = [
 export default class FormatterTool implements ToolInterface {
   // LSP client instance
   private client: LanguageClient | undefined;
+  private binary: BinarySearchResult | undefined;
 
   private documentSelectors = [
     {
@@ -332,11 +334,25 @@ export default class FormatterTool implements ToolInterface {
   }
 
   async activate(binary?: BinarySearchResult) {
+    this.binary = binary;
+
     // No valid binary found for the formatter.
     if (!binary) {
       this.statusBarItemHandler.updateTool("formatter", false, "No valid oxfmt binary found.");
       this.outputChannel.appendLine(
         "No valid oxfmt binary found. Formatter will not be activated.",
+      );
+      return Promise.resolve();
+    }
+
+    if (!canRunBinaryInCurrentWorkspace(binary)) {
+      this.statusBarItemHandler.updateTool(
+        "formatter",
+        false,
+        "Restricted Mode blocks workspace-local oxfmt binaries.",
+      );
+      this.outputChannel.appendLine(
+        "Restricted Mode blocks workspace-local oxfmt binaries. Formatter will not be activated.",
       );
       return Promise.resolve();
     }
@@ -400,7 +416,7 @@ export default class FormatterTool implements ToolInterface {
     };
 
     if (this.configService.vsCodeConfig.enableOxfmt) {
-      await this.client.start();
+      await this.startClientIfAllowed();
     }
 
     this.updateStatusBar();
@@ -415,6 +431,7 @@ export default class FormatterTool implements ToolInterface {
     await this.disposeResources?.();
     this.disposeResources = undefined;
     this.client = undefined;
+    this.binary = undefined;
   }
 
   async restart(): Promise<void> {
@@ -434,7 +451,7 @@ export default class FormatterTool implements ToolInterface {
       }
     } else {
       if (this.configService.vsCodeConfig.enableOxfmt) {
-        await this.client.start();
+        await this.startClientIfAllowed();
       }
     }
   }
@@ -492,5 +509,20 @@ export default class FormatterTool implements ToolInterface {
       text,
       this.client?.initializeResult?.serverInfo?.version,
     );
+  }
+
+  private async startClientIfAllowed(): Promise<void> {
+    if (!this.client || !this.binary) {
+      return;
+    }
+
+    if (!canRunBinaryInCurrentWorkspace(this.binary)) {
+      this.outputChannel.appendLine(
+        "Restricted Mode blocks workspace-local oxfmt binaries. Formatter start skipped.",
+      );
+      return;
+    }
+
+    await this.client.start();
   }
 }

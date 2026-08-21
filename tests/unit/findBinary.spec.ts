@@ -4,7 +4,9 @@ import * as path from "node:path";
 import { tmpdir } from "node:os";
 import { Uri, workspace } from "vscode";
 import {
+  canRunBinaryInCurrentWorkspace,
   clearWorkspacePackageJsonNodeModulesCache,
+  isWorkspaceDerivedBinary,
   replaceTargetFromMainToBin,
   searchGlobalNodeModulesBin,
   searchEnvPath,
@@ -129,6 +131,69 @@ suite("findBinary", () => {
         clearWorkspacePackageJsonNodeModulesCache();
         await workspace.fs.delete(Uri.file(path.join(workspacePath, "packages")), {
           recursive: true,
+        });
+      }
+    });
+  });
+
+  suite("workspace trust filtering", () => {
+    const workspacePath = WORKSPACE_FOLDER.uri.fsPath;
+
+    test("should detect workspace-derived binaries", () => {
+      strictEqual(
+        isWorkspaceDerivedBinary({
+          path: path.join(workspacePath, "node_modules", ".bin", binaryName),
+          loader: "native",
+        }),
+        true,
+      );
+      strictEqual(
+        isWorkspaceDerivedBinary({
+          path: "/usr/local/bin/oxlint",
+          loader: "native",
+        }),
+        false,
+      );
+    });
+
+    test("should detect workspace-derived yarn pnp loaders", () => {
+      strictEqual(
+        isWorkspaceDerivedBinary({
+          path: "/usr/local/bin/oxlint",
+          loader: "node",
+          yarnPnpLoaderPath: path.join(workspacePath, ".pnp.cjs"),
+        }),
+        true,
+      );
+    });
+
+    test("should block workspace-derived binaries in untrusted workspaces", () => {
+      const original = workspace.isTrusted;
+
+      Object.defineProperty(workspace, "isTrusted", {
+        configurable: true,
+        value: false,
+      });
+
+      try {
+        strictEqual(
+          canRunBinaryInCurrentWorkspace({
+            path: path.join(workspacePath, "node_modules", ".bin", binaryName),
+            loader: "native",
+          }),
+          false,
+        );
+        strictEqual(
+          canRunBinaryInCurrentWorkspace({
+            path: "/usr/local/bin/oxlint",
+            loader: "native",
+          }),
+          true,
+        );
+      } finally {
+        Object.defineProperty(workspace, "isTrusted", {
+          configurable: true,
+          value: original,
         });
       }
     });

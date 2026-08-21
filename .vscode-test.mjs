@@ -3,9 +3,16 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const multiRootWorkspaceFile = "./tests/multi-root.test.code-workspace";
+const emptyBinDir = "./tests/empty_bin";
+const sanitizedPath = [
+  path.resolve(import.meta.dirname, emptyBinDir),
+  ...(process.env.PATH?.split(path.delimiter).filter((entry) => !entry.includes("node_modules/.bin")) ??
+    []),
+].join(path.delimiter);
 
 mkdirSync("./tests/test_workspace", { recursive: true });
 mkdirSync("./tests/test_workspace_second", { recursive: true });
+mkdirSync(emptyBinDir, { recursive: true });
 
 const multiRootWorkspaceConfig = {
   folders: [{ path: "test_workspace" }, { path: "test_workspace_second" }],
@@ -86,6 +93,16 @@ const allTestSuites = new Map([
         SINGLE_FOLDER_WORKSPACE: "true",
         SERVER_PATH_DEV: oxfmtBin,
         SKIP_LINTER_TEST: "true",
+      },
+    },
+  ],
+  [
+    "untrusted-workspace",
+    {
+      ...baseTest,
+      env: {
+        SINGLE_FOLDER_WORKSPACE: "true",
+        PATH: sanitizedPath,
       },
     },
   ],

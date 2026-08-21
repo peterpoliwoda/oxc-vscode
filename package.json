@@ -41,6 +41,7 @@
     "test:oxlint-js": "cross-env TEST=true pnpm run compile && cross-env TEST_SUITE=oxlint-js vscode-test",
     "test:oxlint-multi-root": "cross-env TEST=true pnpm run compile && cross-env TEST_SUITE=oxlint-lsp-multi-root vscode-test",
     "test:oxfmt": "cross-env TEST=true pnpm run compile && cross-env TEST_SUITE=oxfmt-lsp vscode-test",
+    "test:untrusted-workspace": "cross-env TEST=true pnpm run compile && cross-env TEST_SUITE=untrusted-workspace vscode-test",
     "lint": "oxlint -c oxlint.config.json",
     "fmt": "oxfmt --write -c oxfmt.config.json",
     "fmt:check": "oxfmt --check -c oxfmt.config.json",
